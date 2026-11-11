@@ -193,7 +193,7 @@ app.post("/api/team/karte/:code/rueckgaengig", team, (req, res) => {
   res.json(r.customer ? { card: cardJson(r.customer) } : r);
 });
 
-app.get("/health", (req, res) => res.json({ ok: true, apple: config.apple.enabled, google: config.google.enabled }));
+app.get("/health", (req, res) => res.json({ ok: true, apple: config.apple.enabled, appleProblems: config.apple.problems, google: config.google.enabled }));
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -203,6 +203,7 @@ app.use((err, req, res, next) => {
 app.listen(config.port, async () => {
   console.log(`Stempelkarte läuft auf ${config.baseUrl} (Port ${config.port})`);
   console.log(`  Apple Wallet:  ${config.apple.enabled ? "aktiv" : "NICHT eingerichtet"}${config.apple.enabled && !config.isHttps ? " (Updates erst mit HTTPS)" : ""}`);
+  for (const p of config.apple.problems) console.warn(`    ⚠️  ${p}`);
   console.log(`  Google Wallet: ${config.google.enabled ? "aktiv" : "NICHT eingerichtet"}`);
   if (!config.staffPin) console.warn("  ⚠️  STAFF_PIN fehlt – Team-Bereich ist gesperrt.");
   if (config.sessionSecret === "bitte-in-env-aendern") console.warn("  ⚠️  SESSION_SECRET ist noch der Standardwert.");
