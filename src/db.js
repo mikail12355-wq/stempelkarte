@@ -1,12 +1,18 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const Database = require("better-sqlite3");
+const { DatabaseSync } = require("node:sqlite"); // in Node eingebaut – kein Maschinencode nötig
 const config = require("./config");
 
 fs.mkdirSync(config.dataDir, { recursive: true });
-const db = new Database(path.join(config.dataDir, "stempelkarte.db"));
-db.pragma("journal_mode = WAL");
+const db = new DatabaseSync(path.join(config.dataDir, "stempelkarte.db"));
+db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
+// Kleiner Helfer für Transaktionen (alles oder nichts)
+db.transaction = (fn) => () => {
+  db.exec("BEGIN");
+  try { const r = fn(); db.exec("COMMIT"); return r; }
+  catch (e) { db.exec("ROLLBACK"); throw e; }
+};
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS customers (

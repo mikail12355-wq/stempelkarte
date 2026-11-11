@@ -3,12 +3,35 @@
 // assets/icon.png (quadratisch) ab – dann werden diese statt der generierten verwendet.
 const fs = require("fs");
 const path = require("path");
-const sharp = require("sharp");
+const { initWasm, Resvg } = require("@resvg/resvg-wasm"); // SVG → PNG ohne Maschinencode
 const config = require("./config");
 
 const ASSETS = path.join(__dirname, "..", "assets");
 const C = config.cafe.colors;
 const cache = new Map();
+
+let ready = null;
+function init() {
+  if (!ready) ready = initWasm(fs.readFileSync(require.resolve("@resvg/resvg-wasm/index_bg.wasm")));
+  return ready;
+}
+async function svgToPng(svg) {
+  await init();
+  return Buffer.from(new Resvg(svg).render().asPng());
+}
+// Eigenes PNG in eine Fläche einpassen (ersetzt das frühere Skalieren mit sharp)
+async function fitImage(png, w, h, bg) {
+  const { width, height } = pngSize(png);
+  const scale = Math.min(w / width, h / height);
+  const dw = width * scale, dh = height * scale;
+  const x = bg ? (w - dw) / 2 : 0, y = (h - dh) / 2;
+  return svgToPng(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}">
+    ${bg ? `<rect width="100%" height="100%" fill="${bg}"/>` : ""}
+    <image x="${x}" y="${y}" width="${dw}" height="${dh}" xlink:href="data:image/png;base64,${png.toString("base64")}"/></svg>`);
+}
+function pngSize(png) {
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
 
 function cupGlyph(color, opacity = 1) {
   // Kaffeetasse in einer 100x100-Box
@@ -53,7 +76,7 @@ function stampGridSvg(filled, total, width, height, bg) {
 
 async function render(key, svgFn) {
   if (cache.has(key)) return cache.get(key);
-  const buf = await sharp(Buffer.from(svgFn())).png().toBuffer();
+  const buf = await svgToPng(svgFn());
   cache.set(key, buf);
   return buf;
 }
@@ -90,7 +113,7 @@ function custom(file) {
 // Quadratisches Icon (Benachrichtigungen, Google-Logo)
 async function icon(size) {
   const own = custom("icon.png");
-  if (own) return sharp(own).resize(size, size, { fit: "contain", background: C.background }).png().toBuffer();
+  if (own) return fitImage(own, size, size, C.background);
   return render(`icon-${size}`, () =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 100 100">
       <rect width="100" height="100" fill="${C.background}" />
@@ -100,7 +123,7 @@ async function icon(size) {
 // Logo oben links auf der Apple-Karte (max. 160x50 Punkte)
 async function appleLogo(scale) {
   const own = custom("logo.png");
-  if (own) return sharp(own).resize(160 * scale, 50 * scale, { fit: "inside" }).png().toBuffer();
+  if (own) return fitImage(own, 160 * scale, 50 * scale, null);
   const s = 50 * scale;
   return render(`logo-${scale}`, () =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 100 100">
