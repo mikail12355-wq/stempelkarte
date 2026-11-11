@@ -69,7 +69,7 @@ app.get("/k/:id/karte.pkpass", async (req, res, next) => {
     const c = q.byId.get(req.params.id);
     if (!c) return res.sendStatus(404);
     const buf = await apple.buildPass(c);
-    res.set({ "Content-Type": "application/vnd.apple.pkpass", "Content-Disposition": `attachment; filename="stempelkarte.pkpass"`, "Last-Modified": new Date(c.updated_at).toUTCString() });
+    res.set({ "Content-Type": "application/vnd.apple.pkpass", "Content-Disposition": `inline; filename="stempelkarte.pkpass"`, "Cache-Control": "no-store", "Last-Modified": new Date(c.updated_at).toUTCString() });
     res.send(buf);
   } catch (e) { next(e); }
 });
